@@ -1,22 +1,26 @@
 module Linear.Context where
 
 import Linear.Grammar
-import qualified Data.Set as Set
-
+import qualified Data.Map as Map
+import Control.Monad.State
 
 data Context =
   Context { contextSlackState  :: Int -- the latest generated slack name
-          , contextConstraints :: [LinExpr]
+          , contextArtifState  :: Int -- the latest generated artificial var name
+          , contextConstraints :: Map.Map VarName LinExpr
           }
 
 initContext :: Context
-initContext = Context 0 []
+initContext = Context 0 Map.empty
 
-addConstraint :: LinIneqExpr -> Context -> Context
+
+addConstraint :: ( MonadState Context m
+                 ) => LinIneqExpr -> m ()
 addConstraint (LinIneqExpr sign expr) (Context slack constraints) =
-
+  
   where
-    makeSlackVar :: LinIneqExpr -> Context -> (LinExpr, Context)
+    makeSlackVar :: ( MonadState Context m
+                    ) => LinIneqExpr -> m LinExpr
     makeSlackVar (LinIneqExpr sign expr) ctx@(Context slack cs) =
       case sign of
         Equ  -> (expr, ctx)
@@ -24,3 +28,17 @@ addConstraint (LinIneqExpr sign expr) (Context slack constraints) =
                 in  (newExpr, Context (slack + 1) (newExpr : cs))
         Gteq -> let newExpr = addVar (SlackVarName slack) (-1) expr
                 in  (newExpr, Context (slack + 1) (newExpr : cs))
+
+
+-- | Builds the substitution expression for error variables
+errorExpr :: VarName -> LinExpr
+errorExpr name =
+  LinExpr (Map.union (Map.singleton (MainVar name) (-1))
+                     errorDiff)
+          0
+  where
+    --   x = (x_e_+) - (x_e_-)
+    -- ~ 0 = (x_e_+) - (x_e_-) - x
+    errorDiff = Map.fromList [ (ErrorVar name ErrorPos, 1)
+                             , (ErrorVar name ErrorNeg, -1)
+                             ]

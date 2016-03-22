@@ -5,10 +5,17 @@ import qualified Data.Map as Map
 
 type MainVarName  = String
 type SlackVarName = Int
+type ErrorVarName = String
+
+data ErrorVarSign
+  = ErrorPos
+  | ErrorNeg
+  deriving (Show, Eq, Ord)
 
 data VarName
   = MainVar  MainVarName
   | SlackVar SlackVarName
+  | ErrorVar ErrorVarName ErrorVarSign
   deriving (Show, Eq, Ord)
 
 
@@ -31,11 +38,29 @@ addVar :: VarName -> Rational -> LinExpr -> LinExpr
 addVar name coeff (LinExpr varmap const) =
   LinExpr (Map.unionWith (+) (Map.singleton name coeff) varmap) const
 
+-- | Multiplies the whole expression by some coefficient
+-- FIXME: What if I multiply by 0?
+magnify :: Rational -> LinExpr -> LinExpr
+magnify x (LinExpr varmap const) =
+  LinExpr (fmap (* x) varmap) (const * x)
+
 -- | Will fail if the variable isn't used in the expression
 orient :: LinExpr -> VarName -> Maybe LinExpr
 orient (LinExpr varmap const) name = do
   coeff <- Map.lookup name varmap
   return $ LinExpr (fmap (/ coeff) varmap) const
+
+-- | Remove a variable from an expression, by leveraging an expression to
+--   facilitate the (sound) removal.
+substitute :: VarName -- ^ Variable to orient
+           -> LinExpr -- ^ Expression /removed/
+           -> LinExpr -- ^ Target Expression
+           -> Maybe LinExpr
+substitute name toRemove (LinExpr varmap const) = do
+  toRemove' <- orient toRemove name
+  let coeff = coeffAt name varmap
+      (LinExpr varmap' const') = magnify coeff toRemove'
+  return $ LinExpr (Map.unionWith (-) varmap varmap') (const - const')
 
 
 data LinIneq
