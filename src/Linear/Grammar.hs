@@ -6,6 +6,7 @@ import qualified Data.Map as Map
 type MainVarName  = String
 type SlackVarName = Int
 type ErrorVarName = String
+type ArtifVarName = Int
 
 data ErrorVarSign
   = ErrorPos
@@ -16,6 +17,7 @@ data VarName
   = MainVar  MainVarName
   | SlackVar SlackVarName
   | ErrorVar ErrorVarName ErrorVarSign
+  | ArtifVar ArtifVarName
   deriving (Show, Eq, Ord)
 
 

@@ -15,9 +15,11 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      Linear
                         Linear.Grammar
+                        Linear.Context
   Other-Modules:        Linear.Internal
   Build-Depends:        base >= 4.8 && < 5
                       , containers
+                      , mtl
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
