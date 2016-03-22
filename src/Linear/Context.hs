@@ -33,13 +33,17 @@ addConstraint (LinIneqExpr sign expr) = do
       newExpr :: LinExpr VarName
       newExpr  = let mainVars :: [MainVarName]
                      mainVars = Map.keys (linExprVars expr)
-                     substitution :: LinExpr VarName -> MainVarName -> Maybe (LinExpr VarName)
-                     substitution expr' name =
-                       substitute (MainVar name) (errorExpr name) expr'
-                     expr' :: LinExpr VarName
-                     expr' = expr { linExprVars = Map.mapKeys MainVar (linExprVars expr)
-                                  }
-                 in  fromJust $ foldM substitution expr' mainVars
+      
+                     substitution :: MainVarName -> LinExpr VarName -> LinExpr VarName
+                     substitution name expr' =
+                       fromJust $ substitute (MainVar name) (errorExpr name) expr'
+
+                     -- pun intended
+                     wellNamedExpr :: LinExpr VarName
+                     wellNamedExpr = expr { linExprVars = Map.mapKeys MainVar (linExprVars expr)
+                                          }
+
+                 in  foldr substitution wellNamedExpr mainVars
   case sign of
     Equ  -> put $ Context slack (artif + 1) (Map.insert newBasic newExpr constraints)
     Lteq -> put $ Context (slack + 1) artif (Map.insert newBasic newExpr constraints)
