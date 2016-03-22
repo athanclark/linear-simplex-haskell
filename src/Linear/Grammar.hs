@@ -3,6 +3,8 @@ module Linear.Grammar where
 import qualified Data.Map as Map
 
 
+-- * Variable Names
+
 type MainVarName  = String
 type SlackVarName = Int
 type ErrorVarName = String
@@ -21,43 +23,49 @@ data VarName
   deriving (Show, Eq, Ord)
 
 
--- | Unique mapping from variable names to their coefficient
-type LinVarMap = Map.Map VarName Rational
+-- * Sets of Variables
 
-coeffAt :: VarName -> LinVarMap -> Rational
+-- | Unique mapping from variable names to their coefficient
+type LinVarMap name = Map.Map name Rational
+
+coeffAt :: Ord name => name -> LinVarMap name -> Rational
 coeffAt name varmap =
   case Map.lookup name varmap of
     Just coeff -> coeff
     Nothing    -> 0
 
-data LinExpr =
-  LinExpr { linExprVars  :: LinVarMap
+
+-- * Expressions
+
+data LinExpr name =
+  LinExpr { linExprVars  :: LinVarMap name
           , linExprConst :: Rational
           }
   deriving (Show)
 
-addVar :: VarName -> Rational -> LinExpr -> LinExpr
+addVar :: Ord name => name -> Rational -> LinExpr name -> LinExpr name
 addVar name coeff (LinExpr varmap const) =
   LinExpr (Map.unionWith (+) (Map.singleton name coeff) varmap) const
 
 -- | Multiplies the whole expression by some coefficient
 -- FIXME: What if I multiply by 0?
-magnify :: Rational -> LinExpr -> LinExpr
+magnify :: Rational -> LinExpr name -> LinExpr name
 magnify x (LinExpr varmap const) =
   LinExpr (fmap (* x) varmap) (const * x)
 
 -- | Will fail if the variable isn't used in the expression
-orient :: LinExpr -> VarName -> Maybe LinExpr
+orient :: Ord name => LinExpr name -> name -> Maybe (LinExpr name)
 orient (LinExpr varmap const) name = do
   coeff <- Map.lookup name varmap
   return $ LinExpr (fmap (/ coeff) varmap) const
 
 -- | Remove a variable from an expression, by leveraging an expression to
 --   facilitate the (sound) removal.
-substitute :: VarName -- ^ Variable to orient
-           -> LinExpr -- ^ Expression /removed/
-           -> LinExpr -- ^ Target Expression
-           -> Maybe LinExpr
+substitute :: ( Ord name
+              ) => name         -- ^ Variable to orient
+                -> LinExpr name -- ^ Expression /removed/
+                -> LinExpr name -- ^ Target Expression
+                -> Maybe (LinExpr name)
 substitute name toRemove (LinExpr varmap const) = do
   toRemove' <- orient toRemove name
   let coeff = coeffAt name varmap
@@ -65,15 +73,18 @@ substitute name toRemove (LinExpr varmap const) = do
   return $ LinExpr (Map.unionWith (-) varmap varmap') (const - const')
 
 
+-- * Inequality Expressions
+
 data LinIneq
   = Equ
   | Lteq
   | Gteq
   deriving (Show)
 
-
+-- | This is only used in the user-facing API, hence why we hardcode the variable name
+--   type to 'MainVarName'.
 data LinIneqExpr =
   LinIneqExpr { linIneqSign :: LinIneq
-              , linIneqExpr :: LinExpr
+              , linIneqExpr :: LinExpr MainVarName
               }
   deriving (Show)
