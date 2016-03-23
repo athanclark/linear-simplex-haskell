@@ -24,9 +24,9 @@ initContext :: Context
 initContext = Context 0 0 Set.empty Map.empty
 
 
-addConstraint :: ( MonadState Context m
-                 ) => LinIneqExpr -> m ()
-addConstraint (LinIneqExpr sign expr) = do
+addConstraintContext :: ( MonadState Context m
+                        ) => LinIneqExpr -> m ()
+addConstraintContext (LinIneqExpr sign expr) = do
   (Context slack artif mainVars constraints) <- get
   let newBasic :: VarName
       newBasic = case sign of

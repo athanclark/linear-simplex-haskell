@@ -14,5 +14,5 @@ spec = testGroup "Linear.Simplex"
       someFunction
   ]
 
-someFunction :: Bool -> Property
-someFunction x = not (not $ x) === x
+solutionIsOptimal :: Set.Set MainVarName -> Property
+solutionIsOptimal names = not (not $ x) === x

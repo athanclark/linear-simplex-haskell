@@ -1,3 +1,7 @@
+{-# LANGUAGE
+    FlexibleContexts
+  #-}
+
 module Linear.Simplex where
 
 import Linear.Grammar
@@ -23,6 +27,12 @@ newTableau objective =
   in  Tableau objective' (initContext { contextMainVars = mainVars
                                       })
 
+addConstraint :: ( MonadState Tableau m
+                 ) => LinIneqExpr -> m ()
+addConstraint ineq = do
+  (Tableau objective context) <- get
+  put . Tableau objective . flip execState context $ do
+    addConstraintContext ineq
 
 -- * Primal Simplex
 
@@ -54,8 +64,8 @@ primalPivot (Tableau objective context) = do
                         -> Maybe (VarName, Rational)
                         -> Maybe (VarName, Rational)
                     go name expr Nothing = (\ratio -> (name, ratio))
-                                        <$> blandRatio entry expr
-                    go name expr acc@(Just (k, ratio)) = case blandRatio entry expr of
+                                        <$> primalBlandRatio entry expr
+                    go name expr acc@(Just (k, ratio)) = case primalBlandRatio entry expr of
                       Just ratio' | ratio' < ratio -> Just (name, ratio')
                       _                            -> acc
                 in  fromJust $ fst <$> Map.foldrWithKey go Nothing (contextConstraints context)
@@ -86,8 +96,8 @@ primalSimplex tab = case primalPivot tab of
   Just tab' -> primalSimplex tab'
 
 -- | Using Bland's finite pivoting method
-blandRatio :: VarName -> LinExpr VarName -> Maybe Rational
-blandRatio name (LinExpr varmap const) = do
+primalBlandRatio :: VarName -> LinExpr VarName -> Maybe Rational
+primalBlandRatio name (LinExpr varmap const) = do
   coeff <- Map.lookup name varmap
   guard (coeff > 0) -- FIXME: View Bland's source, this is wonky.
   let ratio = const / coeff
