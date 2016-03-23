@@ -7,7 +7,6 @@ module Linear.Simplex where
 import Linear.Grammar
 import Linear.Context
 
-import Data.Maybe (fromJust)
 import qualified Data.Map as Map
 import Control.Monad.State
 
@@ -56,7 +55,9 @@ primalPivot (Tableau objective context) = do
                   go k c Nothing = Just (k, c)
                   go k c acc@(Just (k', c')) | c < c'    = Just (k, c)
                                               | otherwise = acc
-              in  fromJust $ fst <$> Map.foldrWithKey go Nothing qualifiedMainVars
+              in  case fst <$> Map.foldrWithKey go Nothing qualifiedMainVars of
+        Nothing   -> error "qualified vars somehow empty"
+        Just name -> name
 
       leaving :: VarName
       leaving = let go :: VarName -- Basic variable
@@ -68,11 +69,15 @@ primalPivot (Tableau objective context) = do
                     go name expr acc@(Just (k, ratio)) = case primalBlandRatio entry expr of
                       Just ratio' | ratio' < ratio -> Just (name, ratio')
                       _                            -> acc
-                in  fromJust $ fst <$> Map.foldrWithKey go Nothing (contextConstraints context)
+                in  case fst <$> Map.foldrWithKey go Nothing (contextConstraints context) of
+        Nothing   -> error "no bland ratios?"
+        Just name -> name
 
       -- Note that the entry var is still intact
       exprToRemove :: LinExpr VarName
-      exprToRemove = let expr = fromJust $ Map.lookup leaving (contextConstraints context)
+      exprToRemove = let expr = case Map.lookup leaving (contextConstraints context) of
+                           Nothing    -> error "leaving var not in constraints"
+                           Just expr' -> expr'
                      in  expr { linExprVars = Map.insert leaving 1 (linExprVars expr)
                               }
 
@@ -82,11 +87,15 @@ primalPivot (Tableau objective context) = do
 
       constraints :: Map.Map VarName (LinExpr VarName)
       constraints = Map.insert entry exprToInclude
-                  $ fmap (fromJust . substitute entry exprToRemove)
+                  $ fmap (\expr -> case substitute entry exprToRemove expr of
+                             Nothing    -> error "entry not in expression to remove"
+                             Just expr' -> expr')
                   $ Map.delete leaving (contextConstraints context)
 
   return $ Tableau
-             (fromJust $ substitute entry exprToRemove objective)
+             (case substitute entry exprToRemove objective of
+                 Nothing    -> error "entry not in to remove for objective"
+                 Just expr' -> expr')
              (context { contextConstraints = constraints
                       })
 
@@ -112,6 +121,8 @@ solution (Tableau _ context) =
       varmap   = basicFeasibleSolution context
       tempExpr = LinExpr varmap 0
       (LinExpr varmap' _) =
-        foldr (\name -> fromJust . derefError name) tempExpr mainVars
+        foldr (\name expr -> case derefError name expr of
+                  Nothing    -> error $ "error variable " ++ show name ++ " not in expression"
+                  Just expr' -> expr') tempExpr mainVars
   in  Map.mapKeys mainVarName $
         Map.filterWithKey (\k _ -> isMainVar k) varmap'

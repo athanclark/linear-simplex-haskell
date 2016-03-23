@@ -5,7 +5,6 @@
 module Linear.Context where
 
 import Linear.Grammar
-import Data.Maybe (fromJust)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Control.Monad.State
@@ -56,13 +55,15 @@ addConstraintContext (LinIneqExpr sign expr) = do
 -- | Escapes the unrestricted variables to their restricted form
 sanitizeExpr :: LinExpr MainVarName
              -> (LinExpr VarName, Set.Set MainVarName)
-sanitizeExpr expr =  
+sanitizeExpr expr =
   let mainVars :: Set.Set MainVarName
       mainVars = Map.keysSet (linExprVars expr)
-  
+
       substitution :: MainVarName -> LinExpr VarName -> LinExpr VarName
       substitution name expr' =
-        fromJust $ substitute (MainVar name) (errorExpr name) expr'
+        case substitute (MainVar name) (errorExpr name) expr' of
+          Nothing     -> error "substitution failed"
+          Just expr'' -> expr''
 
       -- pun intended
       wellNamedExpr :: LinExpr VarName
