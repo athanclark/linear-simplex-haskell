@@ -44,11 +44,11 @@ data LinExpr name =
   LinExpr { linExprVars  :: LinVarMap name
           , linExprConst :: Rational
           }
-  deriving (Show)
+  deriving (Show, Eq)
 
 addVar :: Ord name => name -> Rational -> LinExpr name -> LinExpr name
 addVar name coeff (LinExpr varmap const) =
-  LinExpr (Map.unionWith (+) (Map.singleton name coeff) varmap) const
+  LinExpr (Map.insertWith (+) name coeff varmap) const
 
 -- | Multiplies the whole expression by some coefficient
 -- FIXME: What if I multiply by 0?
@@ -84,7 +84,7 @@ data LinIneq
   = Equ
   | Lteq
   | Gteq
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | This is only used in the user-facing API, hence why we hardcode the variable name
 --   type to 'MainVarName'.
@@ -92,4 +92,20 @@ data LinIneqExpr =
   LinIneqExpr { linIneqSign :: LinIneq
               , linIneqExpr :: LinExpr MainVarName
               }
-  deriving (Show)
+  deriving (Show, Eq)
+
+-- | Evaluate a variable with a value in this expression
+evaluate :: Ord name => name -> Rational -> LinExpr name -> LinExpr name
+evaluate var value (LinExpr varmap const) =
+  let coeff = coeffAt var varmap
+  in  LinExpr (Map.delete var varmap) (const - (coeff * value))
+
+
+-- | Checks to see if a set of values is feasible with respect to this inequality
+isFeasible :: Map.Map MainVarName Rational -> LinIneqExpr -> Bool
+isFeasible solution (LinIneqExpr sign (LinExpr varmap const)) =
+  let value = sum (Map.intersectionWith (*) solution varmap)
+  in  case sign of
+    Equ  -> value == const
+    Lteq -> value <= const
+    Gteq -> value >= const

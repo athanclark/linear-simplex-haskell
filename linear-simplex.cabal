@@ -33,6 +33,8 @@ Test-Suite spec
                       , tasty-hunit
                       , QuickCheck
                       , quickcheck-instances
+                      , containers
+                      , mtl
 
 Source-Repository head
   Type:                 git
