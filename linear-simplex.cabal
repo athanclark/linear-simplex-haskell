@@ -13,11 +13,9 @@ Library
   Default-Language:     Haskell2010
   HS-Source-Dirs:       src
   GHC-Options:          -Wall
-  Exposed-Modules:      Linear
-                        Linear.Grammar
+  Exposed-Modules:      Linear.Grammar
                         Linear.Context
                         Linear.Simplex
-  Other-Modules:        Linear.Internal
   Build-Depends:        base >= 4.8 && < 5
                       , containers
                       , mtl

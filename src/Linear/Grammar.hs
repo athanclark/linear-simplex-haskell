@@ -16,11 +16,14 @@ data ErrorVarSign
   deriving (Show, Eq, Ord)
 
 data VarName
-  = MainVar  MainVarName
+  = MainVar  { mainVarName :: MainVarName }
   | SlackVar SlackVarName
   | ErrorVar ErrorVarName ErrorVarSign
   | ArtifVar ArtifVarName
   deriving (Show, Eq, Ord)
+
+isMainVar (MainVar _) = True
+isMainVar _           = False
 
 
 -- * Sets of Variables

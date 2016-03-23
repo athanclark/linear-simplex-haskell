@@ -28,10 +28,7 @@ newTableau objective =
 
 primalPivot :: Tableau -> Maybe Tableau
 primalPivot (Tableau objective context) = do
-  let isMainVar (MainVar _) = True
-      isMainVar _           = False
-
-      qualifiedMainVars :: LinVarMap VarName
+  let qualifiedMainVars :: LinVarMap VarName
       qualifiedMainVars = Map.filter (< 0) $
         Map.mapWithKey (\k c -> if isMainVar k
                                 then -c
@@ -83,6 +80,11 @@ primalPivot (Tableau objective context) = do
              (context { contextConstraints = constraints
                       })
 
+primalSimplex :: Tableau -> Tableau
+primalSimplex tab = case primalPivot tab of
+  Nothing   -> tab
+  Just tab' -> primalSimplex tab'
+
 -- | Using Bland's finite pivoting method
 blandRatio :: VarName -> LinExpr VarName -> Maybe Rational
 blandRatio name (LinExpr varmap const) = do
@@ -91,3 +93,15 @@ blandRatio name (LinExpr varmap const) = do
   let ratio = const / coeff
   -- guard (ratio > 0)
   return ratio
+
+
+-- | The dereferenced basic feasible solution
+solution :: Tableau -> Map.Map MainVarName Rational
+solution (Tableau _ context) =
+  let mainVars = contextMainVars context
+      varmap   = basicFeasibleSolution context
+      tempExpr = LinExpr varmap 0
+      (LinExpr varmap' _) =
+        foldr (\name -> fromJust . derefError name) tempExpr mainVars
+  in  Map.mapKeys mainVarName $
+        Map.filterWithKey (\k _ -> isMainVar k) varmap'

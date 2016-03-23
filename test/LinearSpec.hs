@@ -1,6 +1,6 @@
 module LinearSpec (spec) where
 
-import Linear
+import Linear.Simplex
 
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
@@ -9,7 +9,7 @@ import Test.QuickCheck.Instances
 
 
 spec :: TestTree
-spec = testGroup "Linear"
+spec = testGroup "Linear.Simplex"
   [ QC.testProperty "`someFunction` should pass"
       someFunction
   ]
