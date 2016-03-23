@@ -3,6 +3,7 @@ module Linear.Simplex where
 import Linear.Grammar
 import Linear.Context
 
+import Data.Maybe (fromJust)
 import qualified Data.Map as Map
 import Control.Monad.State
 
@@ -26,12 +27,12 @@ newTableau objective =
 -- * Primal Simplex
 
 primalPivot :: Tableau -> Maybe Tableau
-primalPivot (Tableau objective context) =
+primalPivot (Tableau objective context) = do
   let isMainVar (MainVar _) = True
       isMainVar _           = False
 
       qualifiedMainVars :: LinVarMap VarName
-      qualifiedMainVars = filter (< 0) $
+      qualifiedMainVars = Map.filter (< 0) $
         Map.mapWithKey (\k c -> if isMainVar k
                                 then -c
                                 else c) (linExprVars objective)
@@ -39,28 +40,48 @@ primalPivot (Tableau objective context) =
       isOptimal :: Bool
       isOptimal = Map.null qualifiedMainVars
 
-  in  guard (not isOptimal) $ do
-    let entry :: VarName
-        entry = let go :: VarName -- Objective variable
-                       -> Rational -- Objective coefficient
-                       -> Maybe (VarName, Rational)
-                       -> Maybe (VarName, Rational)
-                    go k c Nothing = Just (k, c)
-                    go k c acc@(Just (k', c')) | c < c'    = Just (k, c)
-                                               | otherwise = acc
-                in  fromJust $ fst <$> Map.foldrWithKey go Nothing qualifiedMainVars
+  guard (not isOptimal)
+  let entry :: VarName
+      entry = let go :: VarName -- Objective variable
+                      -> Rational -- Objective coefficient
+                      -> Maybe (VarName, Rational)
+                      -> Maybe (VarName, Rational)
+                  go k c Nothing = Just (k, c)
+                  go k c acc@(Just (k', c')) | c < c'    = Just (k, c)
+                                              | otherwise = acc
+              in  fromJust $ fst <$> Map.foldrWithKey go Nothing qualifiedMainVars
 
-        leaving :: VarName
-        leaving = let go :: VarName -- Basic variable
-                         -> LinExpr VarName -- Constraint
-                         -> Maybe (VarName, Rational)
-                         -> Maybe (VarName, Rational)
-                      go name expr Nothing = (\ratio -> (name, ratio))
-                                         <$> blandRatio entry expr
-                      go name expr acc@(Just (k, ratio)) = case blandRatio entry expr of
-                        Just ratio' | ratio' < ratio -> Just (name, ratio')
-                        _                            -> acc
-                  in  fromJust $ fst <$> Map.foldrWithKey go Nothing (contextConstraints context)
+      leaving :: VarName
+      leaving = let go :: VarName -- Basic variable
+                        -> LinExpr VarName -- Constraint
+                        -> Maybe (VarName, Rational)
+                        -> Maybe (VarName, Rational)
+                    go name expr Nothing = (\ratio -> (name, ratio))
+                                        <$> blandRatio entry expr
+                    go name expr acc@(Just (k, ratio)) = case blandRatio entry expr of
+                      Just ratio' | ratio' < ratio -> Just (name, ratio')
+                      _                            -> acc
+                in  fromJust $ fst <$> Map.foldrWithKey go Nothing (contextConstraints context)
+
+      -- Note that the entry var is still intact
+      exprToRemove :: LinExpr VarName
+      exprToRemove = let expr = fromJust $ Map.lookup leaving (contextConstraints context)
+                     in  expr { linExprVars = Map.insert leaving 1 (linExprVars expr)
+                              }
+
+      exprToInclude :: LinExpr VarName
+      exprToInclude = exprToRemove { linExprVars = Map.delete entry (linExprVars exprToRemove)
+                                   }
+
+      constraints :: Map.Map VarName (LinExpr VarName)
+      constraints = Map.insert entry exprToInclude
+                  $ fmap (fromJust . substitute entry exprToRemove)
+                  $ Map.delete leaving (contextConstraints context)
+
+  return $ Tableau
+             (fromJust $ substitute entry exprToRemove objective)
+             (context { contextConstraints = constraints
+                      })
 
 -- | Using Bland's finite pivoting method
 blandRatio :: VarName -> LinExpr VarName -> Maybe Rational

@@ -57,7 +57,7 @@ magnify x (LinExpr varmap const) =
 orient :: Ord name => LinExpr name -> name -> Maybe (LinExpr name)
 orient (LinExpr varmap const) name = do
   coeff <- Map.lookup name varmap
-  return $ LinExpr (fmap (/ coeff) varmap) const
+  return $ LinExpr (fmap (/ coeff) varmap) (const / coeff)
 
 -- | Remove a variable from an expression, by leveraging an expression to
 --   facilitate the (sound) removal.
@@ -70,7 +70,9 @@ substitute name toRemove (LinExpr varmap const) = do
   toRemove' <- orient toRemove name
   let coeff = coeffAt name varmap
       (LinExpr varmap' const') = magnify coeff toRemove'
-  return $ LinExpr (Map.unionWith (-) varmap varmap') (const - const')
+  return $ LinExpr
+             (Map.filter (/= 0) $ Map.unionWith (-) varmap varmap')
+             (const - const')
 
 
 -- * Inequality Expressions
