@@ -89,5 +89,5 @@ blandRatio name (LinExpr varmap const) = do
   coeff <- Map.lookup name varmap
   guard (coeff > 0) -- FIXME: View Bland's source, this is wonky.
   let ratio = const / coeff
-  guard (ratio > 0)
+  -- guard (ratio > 0)
   return ratio
