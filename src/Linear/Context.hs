@@ -32,16 +32,17 @@ addConstraintContext :: ( MonadState Context m
                         ) => LinIneqExpr -> m ()
 addConstraintContext (LinIneqExpr sign expr) = do
   (Context slack artif mainVars constraints) <- get
-  let newBasic :: VarName
-      newBasic = case sign of
+  let (LinExpr varmap const, newMainVars) = sanitizeExpr expr
+      (sign', newExpr) =
+        if const < 0
+        then (invertSign sign, LinExpr (negate <$> varmap) (negate const))
+        else (sign           , LinExpr varmap const)
+      newBasic :: VarName
+      newBasic = case sign' of
         Equ  -> ArtifVar artif
         Lteq -> SlackVar slack
-        Gteq -> SlackVar slack
-      (LinExpr varmap const, newMainVars) = sanitizeExpr expr
-      newExpr = if const < 0
-                then LinExpr (negate <$> varmap) (negate const)
-                else LinExpr varmap const
-  case sign of
+        Gteq -> ArtifVar artif
+  case sign' of
     Equ  -> put $ Context
                     slack
                     (artif + 1)
@@ -52,12 +53,16 @@ addConstraintContext (LinIneqExpr sign expr) = do
                     artif
                     (Set.union mainVars newMainVars)
                     (Map.insert newBasic newExpr constraints)
-    Gteq -> let newExpr' = magnify (-1) newExpr
-            in put $ Context
-                       (slack + 1)
-                       artif
-                       (Set.union mainVars newMainVars)
-                       (Map.insert newBasic newExpr' constraints)
+    Gteq -> let newExpr' = newExpr { linExprVars = Map.insert
+                                                     (SlackVar slack)
+                                                     (-1)
+                                                     (linExprVars newExpr)
+                                   }
+            in  put $ Context
+                        (slack + 1)
+                        (artif + 1)
+                        (Set.union mainVars newMainVars)
+                        (Map.insert newBasic newExpr' constraints)
 
 
 -- | Escapes the unrestricted variables to their restricted form

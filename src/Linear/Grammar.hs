@@ -85,6 +85,12 @@ data LinIneq
   | Gteq
   deriving (Show, Eq)
 
+invertSign :: LinIneq -> LinIneq
+invertSign Equ  = Equ
+invertSign Lteq = Gteq
+invertSign Gteq = Lteq
+
+
 -- | This is only used in the user-facing API, hence why we hardcode the variable name
 --   type to 'MainVarName'.
 data LinIneqExpr =

@@ -92,10 +92,5 @@ stack test
 - Check context for any constraints that have their constant
   as `< 0` - this would mean that the constraint set is
   unsolvable.
-- If a bland ratio can't be found where the coefficient is
-  `> 0`, then the solution is _unbounded_
-- Store the original objective function in the tableau
-  _solely_ for dereferencing - when the objective function
-  is added to the tableau, the main variables' coefficients
-  are inverted, and the measure is s.t. "minimum negative"
-  coefficients have the most maximizing effect on pivots.
+- generate a convext polytope as the initial (solvable) constraint
+  set
