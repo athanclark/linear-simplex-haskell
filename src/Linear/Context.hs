@@ -32,7 +32,10 @@ addConstraintContext (LinIneqExpr sign expr) = do
         Equ  -> ArtifVar artif
         Lteq -> SlackVar slack
         Gteq -> SlackVar slack
-      (newExpr, newMainVars) = sanitizeExpr expr
+      (LinExpr varmap const, newMainVars) = sanitizeExpr expr
+      newExpr = if const < 0
+                then LinExpr (negate <$> varmap) (negate const)
+                else LinExpr varmap const
   case sign of
     Equ  -> put $ Context
                     slack

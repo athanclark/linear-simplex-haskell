@@ -70,7 +70,7 @@ primalPivot (Tableau objective context) = do
                       Just ratio' | ratio' < ratio -> Just (name, ratio')
                       _                            -> acc
                 in  case fst <$> Map.foldrWithKey go Nothing (contextConstraints context) of
-        Nothing   -> error "no bland ratios?"
+        Nothing   -> error "unbounded solution"
         Just name -> name
 
       -- Note that the entry var is still intact
