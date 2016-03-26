@@ -1,6 +1,7 @@
 module Linear.Grammar where
 
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 
 
 -- * Variable Names
@@ -22,6 +23,7 @@ data VarName
   | ArtifVar ArtifVarName
   deriving (Show, Eq, Ord)
 
+isMainVar :: VarName -> Bool
 isMainVar (MainVar _) = True
 isMainVar _           = False
 
@@ -31,11 +33,9 @@ isMainVar _           = False
 -- | Unique mapping from variable names to their coefficient
 type LinVarMap name = Map.Map name Rational
 
+-- | If a coefficient doesn't exist in the map, it's coefficient is @0@.
 coeffAt :: Ord name => name -> LinVarMap name -> Rational
-coeffAt name varmap =
-  case Map.lookup name varmap of
-    Just coeff -> coeff
-    Nothing    -> 0
+coeffAt name varmap = fromMaybe 0 (Map.lookup name varmap)
 
 
 -- * Expressions
@@ -51,16 +51,15 @@ addVar name coeff (LinExpr varmap const) =
   LinExpr (Map.insertWith (+) name coeff varmap) const
 
 -- | Multiplies the whole expression by some coefficient
--- FIXME: What if I multiply by 0?
 magnify :: Rational -> LinExpr name -> LinExpr name
 magnify x (LinExpr varmap const) =
-  LinExpr (fmap (* x) varmap) (const * x)
+  LinExpr ((* x) <$> varmap) (const * x)
 
 -- | Will fail if the variable isn't used in the expression
 orient :: Ord name => LinExpr name -> name -> Maybe (LinExpr name)
-orient (LinExpr varmap const) name = do
+orient expr@(LinExpr varmap _) name = do
   coeff <- Map.lookup name varmap
-  return $ LinExpr (fmap (/ coeff) varmap) (const / coeff)
+  return (magnify (recip coeff) expr)
 
 -- | Remove a variable from an expression, by leveraging an expression to
 --   facilitate the (sound) removal.

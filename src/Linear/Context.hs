@@ -12,17 +12,22 @@ import Control.Monad.State
 
 -- | The stateful component of the computation
 data Context =
-  Context { contextSlackState  :: Int -- ^ latest generated slack name
-          , contextArtifState  :: Int -- ^ latest generated artificial var name
-          , contextMainVars    :: Set.Set MainVarName -- ^ unrestricted variable names 
-          , contextConstraints :: Map.Map VarName (LinExpr VarName)
+  Context { -- | latest generated slack name
+            contextSlackState  :: Int
+          , -- | latest generated artificial var name
+            contextArtifState  :: Int
+          , -- | unrestricted variable names
+            contextMainVars    :: Set.Set MainVarName
+          , -- | the constraints, indexed by basic variables
+            contextConstraints :: Map.Map VarName (LinExpr VarName)
           }
   deriving (Show)
 
+-- | The empty context
 initContext :: Context
 initContext = Context 0 0 Set.empty Map.empty
 
-
+-- | Add a constraint into the context
 addConstraintContext :: ( MonadState Context m
                         ) => LinIneqExpr -> m ()
 addConstraintContext (LinIneqExpr sign expr) = do
