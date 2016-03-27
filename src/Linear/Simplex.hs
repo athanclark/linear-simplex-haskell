@@ -122,7 +122,7 @@ primalSimplex tab =
   trace "Pivoting..." $
   let postPivot = primalPivot tab
   in case postPivot of
-       Left err | err == IsOptimal -> Right tab
+       Left err | err == IsOptimal -> trace "Finished." (Right tab)
                 | otherwise        -> Left err
        Right tab'                  -> primalSimplex tab'
 
