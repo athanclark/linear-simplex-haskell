@@ -44,7 +44,12 @@ data LinExpr name =
   LinExpr { linExprVars  :: LinVarMap name
           , linExprConst :: Rational
           }
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show name => Show (LinExpr name) where
+  show (LinExpr varmap const) =
+    show (Map.toList varmap) ++ ", " ++ show const
+
 
 addVar :: Ord name => name -> Rational -> LinExpr name -> LinExpr name
 addVar name coeff (LinExpr varmap const) =
@@ -83,7 +88,12 @@ data LinIneq
   = Equ
   | Lteq
   | Gteq
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show LinIneq where
+  show Equ  = ".==."
+  show Lteq = ".<=."
+  show Gteq = ".>=."
 
 invertSign :: LinIneq -> LinIneq
 invertSign Equ  = Equ
@@ -97,7 +107,12 @@ data LinIneqExpr =
   LinIneqExpr { linIneqSign :: LinIneq
               , linIneqExpr :: LinExpr MainVarName
               }
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show LinIneqExpr where
+  show (LinIneqExpr sign expr) =
+    "{{{" ++ show expr ++ " via " ++ show sign ++ "}}}"
+
 
 -- | Evaluate a variable with a value in this expression
 evaluate :: Ord name => name -> Rational -> LinExpr name -> LinExpr name

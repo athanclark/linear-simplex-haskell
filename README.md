@@ -89,8 +89,5 @@ stack test
 
 # TODO
 
-- Check context for any constraints that have their constant
-  as `< 0` - this would mean that the constraint set is
-  unsolvable.
 - generate a convext polytope as the initial (solvable) constraint
   set

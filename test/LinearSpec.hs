@@ -27,26 +27,27 @@ spec = testGroup "Linear.Simplex"
 
 data OptimalCheck = OptimalCheck
   { optimalConstraints :: [LinIneqExpr]
-  , optimalObjective   :: LinExpr MainVarName
+  , optimalObjective   :: LinVarMap MainVarName
   , optimalFeasibles   :: [Map.Map MainVarName Rational]
-  } deriving (Show, Eq)
+  } deriving (Eq)
+
+instance Show OptimalCheck where
+  show (OptimalCheck cs obj feasibles) =
+    "Constraints:\n" ++ unlines ((\c -> "\t" ++ show c) <$> cs)
+    ++ "\nObjective:\n" ++ show obj ++ "\nFeasibles:\n" ++ show feasibles
 
 instance Arbitrary OptimalCheck where
   arbitrary = do
-    names <- arbitrary `suchThat` (\s -> Set.size s > 2 && all (\v -> length v > 1 && length v < 10) s)
-    let (objName, vars) = fromJust (Set.maxView names)
+    vars <- arbitrary `suchThat` (\s -> Set.size s > 2
+                                     && all (\v -> length v > 1 && length v < 10) s)
     n <- choose (10, 100)
     constraints <- replicateM n (LinIneqExpr Lteq <$> arbitraryLinExpr vars)
-    objective'  <- arbitraryLinExpr vars
-    let objective = objective'
-                      { linExprVars = Map.insert objName 1 (linExprVars objective')
-                      }
+    (LinExpr objective _)  <- arbitraryLinExpr vars
     feasibles <- replicateM 10 $ do
       values <- replicateM (Set.size vars) arbitrary
       let solution' = (% 1) <$> Map.fromList (Set.toList vars `zip` values)
       return solution' `suchThat` (\s -> all (isFeasible s) constraints)
-    trace ("Feasibles: " ++ show feasibles) $
-      return $ OptimalCheck constraints objective feasibles
+    return $ OptimalCheck constraints objective feasibles
 
 arbitraryRational :: Gen Rational
 arbitraryRational = do
@@ -55,23 +56,25 @@ arbitraryRational = do
 
 arbitraryLinExpr :: Set.Set MainVarName -> Gen (LinExpr MainVarName)
 arbitraryLinExpr vars = do
-  varsIncluded <- (foldM (\acc v -> do shouldInclude <- arbitrary
-                                       return $ if shouldInclude
-                                                then Set.insert v acc
-                                                else acc)
-                         Set.empty
-                         vars) `suchThat` (not . Set.null)
-  varmap <- (foldM (\acc v -> do coeff <- arbitraryRational
-                                 return $ Map.insert v coeff acc)
-                   Map.empty
-                   varsIncluded) `suchThat` (not . Map.null)
-  const <- abs <$> arbitraryRational
+  varsIncluded <- foldM (\acc v -> do shouldInclude <- arbitrary
+                                      return $ if shouldInclude
+                                               then Set.insert v acc
+                                               else acc)
+                        Set.empty
+                        vars `suchThat` (not . Set.null)
+  varmap <- foldM (\acc v -> do coeff <- arbitraryRational
+                                return $ Map.insert v coeff acc)
+                  Map.empty
+                  varsIncluded `suchThat` (not . Map.null)
+  const <- ((+ 10) . abs) <$> arbitraryRational
   return (LinExpr varmap const)
 
 solutionIsFeasible :: OptimalCheck -> Bool
 solutionIsFeasible opt@(OptimalCheck constraints objective feasibles) =
   trace ("Example Test:" ++ show opt) $
   let tableau         = execState (mapM_ addConstraint constraints) (newTableau objective)
-      optimalTableau  = primalSimplex tableau
+      optimalTableau  = case primalSimplex tableau of
+                          Left err  -> error (show err)
+                          Right tab -> tab
       optimalSolution = solution optimalTableau
   in  all (isFeasible optimalSolution) constraints

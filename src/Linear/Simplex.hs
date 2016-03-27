@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 import Control.Monad.State
 import Control.Monad.Error (throwError)
 
+import Debug.Trace
 
 
 -- * Tableau
@@ -36,9 +37,7 @@ newTableau objective =
   let (LinExpr objective' _, mainVars) = sanitizeExpr (LinExpr objective 0)
   in  Tableau
         objective
-        (Map.mapWithKey (\k c -> if isMainVar k
-                                 then -c
-                                 else c) objective')
+        (negate <$> objective')
         (initContext {contextMainVars = mainVars})
 
 -- | Adds a constraint to the tableau
@@ -77,51 +76,55 @@ primalPivot (Tableau deref objective context) = do
                     Nothing   -> error "impossible case - qualified vars empty"
                     Just name -> name
 
-  leaving <- let go :: VarName -- Basic variable
-                    -> LinExpr VarName -- Constraint
-                    -> Maybe (VarName, Rational)
-                    -> Maybe (VarName, Rational)
-                 go name expr Nothing = (\ratio -> (name, ratio))
-                                     <$> primalBlandRatio entry expr
-                 go name expr acc@(Just (k, ratio)) = case primalBlandRatio entry expr of
-                   Just ratio' | ratio' < ratio -> Just (name, ratio')
-                   _                            -> acc
-             in  case fst <$> Map.foldrWithKey go Nothing (contextConstraints context) of
-                   Nothing   -> throwError UnboundedSolution
-                   Just name -> return name
+  trace ("Entry var: " ++ show entry) $ do
+    leaving <- let go :: VarName -- Basic variable
+                      -> LinExpr VarName -- Constraint
+                      -> Maybe (VarName, Rational)
+                      -> Maybe (VarName, Rational)
+                   go name expr Nothing = (\ratio -> (name, ratio))
+                                       <$> primalBlandRatio entry expr
+                   go name expr acc@(Just (k, ratio)) = case primalBlandRatio entry expr of
+                     Just ratio' | ratio' < ratio -> Just (name, ratio')
+                     _                            -> acc
+              in  case fst <$> Map.foldrWithKey go Nothing (contextConstraints context) of
+                    Nothing   -> throwError UnboundedSolution
+                    Just name -> return name
 
-      -- Note that the entry var is still intact
-  let exprToRemove :: LinExpr VarName
-      exprToRemove = let expr = case Map.lookup leaving (contextConstraints context) of
-                                  Nothing    -> error "impossible - leaving var not in constraints"
-                                  Just expr' -> expr'
-                     in  expr { linExprVars = Map.insert leaving 1 (linExprVars expr)
-                              }
+        -- Note that the entry var is still intact
+    let exprToRemove :: LinExpr VarName
+        exprToRemove = let expr = case Map.lookup leaving (contextConstraints context) of
+                                    Nothing    -> error "impossible - leaving var not in constraints"
+                                    Just expr' -> expr'
+                       in  expr { linExprVars = Map.insert leaving 1 (linExprVars expr)
+                                }
 
-      exprToInclude :: LinExpr VarName
-      exprToInclude = exprToRemove { linExprVars = Map.delete entry (linExprVars exprToRemove)
-                                   }
+        exprToInclude :: LinExpr VarName
+        exprToInclude = exprToRemove { linExprVars = Map.delete entry (linExprVars exprToRemove)
+                                     }
 
-      constraints :: Map.Map VarName (LinExpr VarName)
-      constraints = Map.insert entry exprToInclude
-                  $ fmap (\expr -> case substitute entry exprToRemove expr of
-                                     Nothing    -> error "impossible - entry not in expression to remove"
-                                     Just expr' -> expr')
-                  $ Map.delete leaving (contextConstraints context)
+        constraints :: Map.Map VarName (LinExpr VarName)
+        constraints = Map.insert entry exprToInclude
+                    $ fmap (\expr -> case substitute entry exprToRemove expr of
+                                       Nothing    -> error "impossible - entry not in expression to remove"
+                                       Just expr' -> expr')
+                    $ Map.delete leaving (contextConstraints context)
 
-  return $ Tableau
-             deref
-             (case substitute entry exprToRemove (LinExpr objective 0) of
-                 Nothing                     -> error "impossible - entry not in expression to remove, for objective"
-                 Just (LinExpr objective' _) -> objective')
-             (context { contextConstraints = constraints
-                      })
+    return $ Tableau
+              deref
+              (case substitute entry exprToRemove (LinExpr objective 0) of
+                  Nothing                     -> error "impossible - entry not in expression to remove, for objective"
+                  Just (LinExpr objective' _) -> objective')
+              (context { contextConstraints = constraints
+                       })
 
 primalSimplex :: Tableau -> Either PivotError Tableau
-primalSimplex tab = case primalPivot tab of
-  Left err | err == IsOptimal -> Right tab
-           | otherwise        -> Left err
-  Right tab'                  -> primalSimplex tab'
+primalSimplex tab =
+  trace "Pivoting..." $
+  let postPivot = primalPivot tab
+  in case postPivot of
+       Left err | err == IsOptimal -> Right tab
+                | otherwise        -> Left err
+       Right tab'                  -> primalSimplex tab'
 
 -- | Using Bland's finite pivoting method
 primalBlandRatio :: VarName -> LinExpr VarName -> Maybe Rational

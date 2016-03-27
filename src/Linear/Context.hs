@@ -80,19 +80,17 @@ sanitizeExpr expr =
 
       -- pun intended
       wellNamedExpr :: LinExpr VarName
-      wellNamedExpr = expr { linExprVars = Map.mapKeys MainVar (linExprVars expr)
-                           }
+      wellNamedExpr = expr {linExprVars = Map.mapKeys MainVar (linExprVars expr)}
 
   in  (foldr substitution wellNamedExpr mainVars, mainVars)
 
 -- | Builds the substitution expression for error variables
 errorExpr :: MainVarName -> LinExpr VarName
 errorExpr name =
-  let varmap = Map.insert (MainVar name) (-1) errorDiff
+  let varmap = Map.insert (MainVar name) 1 errorDiff
   in  LinExpr varmap 0
   where
-    --   x = (x_e_+) - (x_e_-)
-    -- ~ 0 = (x_e_+) - (x_e_-) - x
+    -- 0 = (x_e_+) - (x_e_-) + x
     errorDiff = Map.fromList [ (ErrorVar name ErrorPos, 1)
                              , (ErrorVar name ErrorNeg, -1)
                              ]
